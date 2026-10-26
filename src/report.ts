@@ -157,11 +157,19 @@ ${rows}
 `;
 }
 
+function headline(stats: AgentStats[], repo: string): string {
+  if (!stats.length) return `No results yet for ${esc(repo)}`;
+  const tied = stats.filter((s) => s.rate === stats[0].rate);
+  const names = tied.map((s) => `<em>${esc(s.agent)}</em>`);
+  if (tied.length === 1) return `${names[0]} solves ${pct(stats[0].rate)} of ${esc(repo)}'s real PRs`;
+  const list = names.length === 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+  return `${list} tie at ${pct(stats[0].rate)} on ${esc(repo)}'s real PRs`;
+}
+
 export function renderHtml(meta: RunMeta, tasks: Task[], results: RunResult[], stats: AgentStats[]): string {
   const agents = stats.map((s) => s.agent);
   const byKey = new Map(results.map((r) => [`${r.taskId}|${r.agent}`, r]));
   const runTasks = tasks.filter((t) => results.some((r) => r.taskId === t.id));
-  const best = stats[0]?.rate ?? 0;
   const statusLabel: Record<RunResult["status"], string> = {
     passed: "Passed",
     failed: "Tests failed",
@@ -285,7 +293,7 @@ code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--trac
 <body>
 <main>
   <p class="kicker">repobench · ${esc(meta.runId)}</p>
-  <h1>${stats[0] ? `<em>${esc(stats[0].agent)}</em> solves ${pct(best)} of ${esc(meta.repo)}'s real PRs` : `No results yet for ${esc(meta.repo)}`}</h1>
+  <h1>${headline(stats, meta.repo)}</h1>
   <p class="lede">Each task is a merged PR from this repo. The agent starts from the code as it was before the PR, gets only the PR's description, and is graded by the tests that shipped with the PR. Nothing here was written by an LLM judge.</p>
   <ul class="facts">
     <li><b>${runTasks.length}</b> tasks</li>

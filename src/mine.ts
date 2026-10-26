@@ -229,7 +229,7 @@ export async function mineAndValidate(
     if (!v.ok) {
       counts[v.reason!] = (counts[v.reason!] ?? 0) + 1;
       rejectedStore[`${c.id}@${c.commit}`] = v.reason!;
-      log(`    ✗ ${v.reason}`);
+      log(`    ✗ ${c.id}: ${v.reason}`);
       return;
     }
     if (existing + added.length >= opts.want) return;
