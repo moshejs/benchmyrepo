@@ -8,7 +8,7 @@
   },
   "files": [
     "bin",
-    "dist"
+    "dist/src"
   ],
   "engines": {
     "node": ">=20"
