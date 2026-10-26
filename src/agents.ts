@@ -121,7 +121,7 @@ export function resolveAgent(label: string, custom: Record<string, string> = {})
   const [name, ...rest] = label.split(":");
   const model = rest.join(":") || undefined;
   const b = BUILTIN[name];
-  if (!b) throw new Error(`unknown agent "${name}". Built in: ${BUILTIN_AGENTS.join(", ")}; or add one under "agents" in .repobench/config.json`);
+  if (!b) throw new Error(`unknown agent "${name}". Built in: ${BUILTIN_AGENTS.join(", ")}; or add one under "agents" in .benchmyrepo/config.json`);
   return { label, bin: b.bin, args: (p, o) => b.args(p, { ...o, model: o.model ?? model }), parse: b.parse };
 }
 

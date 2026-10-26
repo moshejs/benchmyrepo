@@ -13,7 +13,7 @@ const ENV = {
 };
 
 export async function makeFixture(): Promise<string> {
-  const dir = mkdtempSync(join(tmpdir(), "repobench-fixture-"));
+  const dir = mkdtempSync(join(tmpdir(), "benchmyrepo-fixture-"));
   const w = (p: string, s: string) => {
     mkdirSync(join(dir, p, ".."), { recursive: true });
     writeFileSync(join(dir, p), s);

@@ -56,7 +56,7 @@ export async function runBenchmark(repoRoot: string, store: Store, config: Confi
 
 async function runOne(repoRoot: string, store: Store, config: Config, task: Task, spec: AgentSpec, o: RunOptions, runDir: string): Promise<RunResult> {
   const slug = `${task.id}__${spec.label.replace(/[^A-Za-z0-9._-]/g, "_")}`;
-  const ws = join(tmpdir(), "repobench", "runs", `${slug}-${process.pid}`);
+  const ws = join(tmpdir(), "benchmyrepo", "runs", `${slug}-${process.pid}`);
   const logPath = join(runDir, "logs", `${slug}.log`);
   const base = { taskId: task.id, agent: spec.label, agentMs: 0, testMs: 0, linesChanged: 0 };
   const finish = (r: Omit<RunResult, "finishedAt">): RunResult => ({ ...r, finishedAt: new Date().toISOString() });

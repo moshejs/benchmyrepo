@@ -1,4 +1,4 @@
-// On-disk layout, all inside the user's repo under .repobench/ (git-excluded):
+// On-disk layout, all inside the user's repo under .benchmyrepo/ (git-excluded):
 //   config.json            detected test command etc.
 //   tasks/<id>/task.json   one validated task
 //   tasks/<id>/tests.patch the PR's test changes (hidden from agents)
@@ -66,19 +66,19 @@ export interface RunMeta {
 export class Store {
   readonly dir: string;
   constructor(readonly repoRoot: string) {
-    this.dir = join(repoRoot, ".repobench");
+    this.dir = join(repoRoot, ".benchmyrepo");
   }
 
   ensure() {
     mkdirSync(join(this.dir, "tasks"), { recursive: true });
     mkdirSync(join(this.dir, "runs"), { recursive: true });
-    // Keep .repobench out of the user's `git status` without touching their .gitignore.
+    // Keep .benchmyrepo out of the user's `git status` without touching their .gitignore.
     const exclude = join(this.repoRoot, ".git", "info", "exclude");
     if (existsSync(join(this.repoRoot, ".git", "info")) || existsSync(join(this.repoRoot, ".git"))) {
       try {
         mkdirSync(join(this.repoRoot, ".git", "info"), { recursive: true });
         const cur = existsSync(exclude) ? readFileSync(exclude, "utf8") : "";
-        if (!cur.split("\n").includes(".repobench/")) appendFileSync(exclude, `${cur.endsWith("\n") || !cur ? "" : "\n"}.repobench/\n`);
+        if (!cur.split("\n").includes(".benchmyrepo/")) appendFileSync(exclude, `${cur.endsWith("\n") || !cur ? "" : "\n"}.benchmyrepo/\n`);
       } catch {
         /* .git may be a file (worktree); not fatal */
       }

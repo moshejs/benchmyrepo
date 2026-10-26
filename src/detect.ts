@@ -67,7 +67,7 @@ export function findLinkDirs(repoRoot: string): string[] {
       return;
     }
     for (const name of entries) {
-      if (name === ".git" || name === ".repobench" || name === ".venv" || name === "venv") continue;
+      if (name === ".git" || name === ".benchmyrepo" || name === ".venv" || name === "venv") continue;
       const full = join(dir, name);
       if (!isDir(full)) continue;
       if (name === "node_modules") found.push(relative(repoRoot, full));

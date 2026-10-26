@@ -7,16 +7,16 @@ import { runBenchmark } from "./run.js";
 import { computeStats, terminalTable, writeReport } from "./report.js";
 import { Store } from "./store.js";
 
-const HELP = `repobench: benchmark coding agents on your own repo's merged PRs
+const HELP = `benchmyrepo: benchmark coding agents on your own repo's merged PRs
 
 Usage:
-  repobench init     [--source github|git] [--tasks 20] [--scan 200] [--since 2026-01-01]
+  benchmyrepo init     [--source github|git] [--tasks 20] [--scan 200] [--since 2026-01-01]
                      [--test-cmd "npx vitest run {files}"] [--concurrency 4]
-  repobench tasks
-  repobench run      [--agents claude,codex] [--tasks 10] [--concurrency 2]
+  benchmyrepo tasks
+  benchmyrepo run      [--agents claude,codex] [--tasks 10] [--concurrency 2]
                      [--timeout 20] [--yolo] [--keep] [--resume <runId>]
-  repobench report   [runId] [--open]
-  repobench doctor
+  benchmyrepo report   [runId] [--open]
+  benchmyrepo doctor
 
 init    finds merged PRs that changed source + tests, and keeps the ones whose tests
         fail before the fix and pass after it, on your machine.
@@ -90,7 +90,7 @@ async function init(root: string, store: Store, argv: string[]): Promise<number>
     if (config.linkDirs.length) log(`Reusing from your checkout: ${config.linkDirs.join(", ")}`);
     store.writeConfig(config);
   } else {
-    log(`Test command: ${config.testCommand}  (from .repobench/config.json)`);
+    log(`Test command: ${config.testCommand}  (from .benchmyrepo/config.json)`);
   }
 
   const source = (values.source as "github" | "git" | undefined) ?? ((await hasGithub(root)) ? "github" : "git");
@@ -111,7 +111,7 @@ async function init(root: string, store: Store, argv: string[]): Promise<number>
   );
   const total = store.listTasks().length;
   log("");
-  log(`Added ${added.length} task(s); ${total} total in .repobench/tasks.`);
+  log(`Added ${added.length} task(s); ${total} total in .benchmyrepo/tasks.`);
   const skipped = Object.entries(rejected).sort((a, b) => b[1] - a[1]);
   if (skipped.length) log(`Skipped: ${skipped.map(([k, v]) => `${v} ${k}`).join(", ")}`);
   if (!total) {
@@ -119,7 +119,7 @@ async function init(root: string, store: Store, argv: string[]): Promise<number>
     return 1;
   }
   const have = await installedAgents();
-  log(`\nNext: npx repobench run --agents ${have.length ? have.join(",") : "claude"} --tasks ${Math.min(total, 10)}`);
+  log(`\nNext: npx benchmyrepo run --agents ${have.length ? have.join(",") : "claude"} --tasks ${Math.min(total, 10)}`);
   return 0;
 }
 
@@ -132,7 +132,7 @@ async function hasGithub(root: string) {
 function tasks(store: Store): number {
   const ts = store.listTasks();
   if (!ts.length) {
-    log("No tasks yet. Run: npx repobench init");
+    log("No tasks yet. Run: npx benchmyrepo init");
     return 1;
   }
   for (const t of ts) log(`${t.id.padEnd(18)} ${t.mergedAt.slice(0, 10)}  ${String(t.goldLines).padStart(4)} lines  ${t.title.slice(0, 80)}`);
@@ -155,9 +155,9 @@ async function run(root: string, store: Store, argv: string[]): Promise<number> 
     },
   });
   const config = store.readConfig();
-  if (!config) throw new Error("no config yet. Run: npx repobench init");
+  if (!config) throw new Error("no config yet. Run: npx benchmyrepo init");
   let all = store.listTasks();
-  if (!all.length) throw new Error("no tasks yet. Run: npx repobench init");
+  if (!all.length) throw new Error("no tasks yet. Run: npx benchmyrepo init");
 
   let agents: string[];
   let picked = all;
@@ -198,7 +198,7 @@ async function run(root: string, store: Store, argv: string[]): Promise<number> 
 async function report(store: Store, argv: string[]): Promise<number> {
   const { values, positionals } = parseArgs({ args: argv, allowPositionals: true, options: { open: { type: "boolean", default: false } } });
   const runId = positionals[0] ?? store.listRuns().at(-1);
-  if (!runId) throw new Error("no runs yet. Run: npx repobench run");
+  if (!runId) throw new Error("no runs yet. Run: npx benchmyrepo run");
   const meta = store.readRunMeta(runId);
   const results = store.readResults(runId);
   const files = writeReport(store.runDir(runId), meta, store.listTasks(), results);

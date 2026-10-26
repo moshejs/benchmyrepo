@@ -1,9 +1,9 @@
 {
-  "name": "repobench",
+  "name": "benchmyrepo",
   "version": "0.1.0",
   "description": "Benchmark the coding agents you already have on your own repo's merged PRs. Local, one command.",
   "type": "module",
-  "bin": { "repobench": "bin/repobench.js" },
+  "bin": { "benchmyrepo": "bin/benchmyrepo.js" },
   "files": ["bin", "dist"],
   "engines": { "node": ">=20" },
   "scripts": {

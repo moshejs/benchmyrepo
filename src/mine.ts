@@ -176,7 +176,7 @@ export interface ValidateResult {
 
 /** A task is valid if its tests fail before the fix and pass with the original fix, in your environment. */
 export async function validateTask(repoRoot: string, config: Config, task: Task, testsPatch: string, goldPatch: string): Promise<ValidateResult> {
-  const dir = join(tmpdir(), "repobench", "validate", `${task.id}-${process.pid}`);
+  const dir = join(tmpdir(), "benchmyrepo", "validate", `${task.id}-${process.pid}`);
   try {
     await createWorkspace(repoRoot, task.base, dir, config);
     await installTests(dir, task, testsPatch);

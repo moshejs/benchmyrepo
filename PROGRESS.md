@@ -14,5 +14,5 @@
 ## Next
 - Demo GIF for the README (asciinema/vhs of `init` + `run`).
 - Install codex/gemini and run all four agents on a real repo; fix the adapters.
-- Create a private GitHub repo, push, then publish to npm (name `repobench`, check it's free).
+- Publish to npm as `benchmyrepo` (free as of 2026-10-25; `repobench` was taken, hence the rename).
 - Ideas: `--since` defaulting per model cutoff, a GitHub Action that posts the card, flaky-test rerun during validation.

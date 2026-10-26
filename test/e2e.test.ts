@@ -54,7 +54,7 @@ test("mines, validates, runs and reports on a fixture repo", { skip: !hasPytest 
     assert.match(readFileSync(files.badge, "utf8"), /fake 50%/);
     assert.match(readFileSync(files.card, "utf8"), /Which agent fixes/);
 
-    // The user's checkout is untouched apart from the git-excluded .repobench dir.
+    // The user's checkout is untouched apart from the git-excluded .benchmyrepo dir.
     const status = await exec("git", ["status", "--porcelain"], { cwd: repo });
     assert.equal(status.stdout.trim(), "");
   } finally {

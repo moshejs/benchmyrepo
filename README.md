@@ -1,10 +1,10 @@
-# repobench
+# benchmyrepo
 
-**Which coding agent is actually best on _your_ code?** Public leaderboards measure someone else's repo. repobench takes your repo's own merged PRs, gives each one to the agents you already have installed, and grades them with the tests that shipped with the PR.
+**Which coding agent is actually best on _your_ code?** Public leaderboards measure someone else's repo. benchmyrepo takes your repo's own merged PRs, gives each one to the agents you already have installed, and grades them with the tests that shipped with the PR.
 
 ```bash
-npx repobench init        # turn merged PRs into tasks
-npx repobench run         # run every installed agent on them
+npx benchmyrepo init        # turn merged PRs into tasks
+npx benchmyrepo run         # run every installed agent on them
 ```
 
 ```
@@ -35,11 +35,11 @@ You get a single-file `report.html`, a `leaderboard.svg` card to share, and a `b
 ## Commands
 
 ```bash
-npx repobench init   [--tasks 20] [--scan 200] [--since 2026-01-01] [--source github|git] [--test-cmd "…{files}"]
-npx repobench tasks
-npx repobench run    [--agents claude,claude:haiku,codex] [--tasks 10] [--concurrency 2] [--timeout 20] [--yolo]
-npx repobench report [runId] [--open]
-npx repobench doctor
+npx benchmyrepo init   [--tasks 20] [--scan 200] [--since 2026-01-01] [--source github|git] [--test-cmd "…{files}"]
+npx benchmyrepo tasks
+npx benchmyrepo run    [--agents claude,claude:haiku,codex] [--tasks 10] [--concurrency 2] [--timeout 20] [--yolo]
+npx benchmyrepo report [runId] [--open]
+npx benchmyrepo doctor
 ```
 
 - `agent:model` picks a model, for example `claude:opus` or `codex:gpt-5.5`.
@@ -48,7 +48,7 @@ npx repobench doctor
 
 ### Custom agents
 
-Add any CLI to `.repobench/config.json`:
+Add any CLI to `.benchmyrepo/config.json`:
 
 ```json
 { "agents": { "aider": "aider --yes-always --message-file {prompt_file}" } }

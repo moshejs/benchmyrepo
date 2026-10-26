@@ -8,10 +8,10 @@ import type { Config, Task } from "./store.js";
 
 const GIT_ENV = {
   ...process.env,
-  GIT_AUTHOR_NAME: "repobench",
-  GIT_AUTHOR_EMAIL: "repobench@localhost",
-  GIT_COMMITTER_NAME: "repobench",
-  GIT_COMMITTER_EMAIL: "repobench@localhost",
+  GIT_AUTHOR_NAME: "benchmyrepo",
+  GIT_AUTHOR_EMAIL: "benchmyrepo@localhost",
+  GIT_COMMITTER_NAME: "benchmyrepo",
+  GIT_COMMITTER_EMAIL: "benchmyrepo@localhost",
 };
 
 export async function createWorkspace(repoRoot: string, sha: string, dir: string, config: Config): Promise<void> {
