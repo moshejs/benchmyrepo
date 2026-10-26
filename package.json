@@ -1,0 +1,21 @@
+{
+  "name": "repobench",
+  "version": "0.1.0",
+  "description": "Benchmark the coding agents you already have on your own repo's merged PRs. Local, one command.",
+  "type": "module",
+  "bin": { "repobench": "bin/repobench.js" },
+  "files": ["bin", "dist"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test dist/test/",
+    "prepublishOnly": "npm test"
+  },
+  "keywords": ["ai", "coding-agents", "benchmark", "swe-bench", "claude-code", "codex", "gemini", "cli"],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}
