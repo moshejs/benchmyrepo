@@ -14,5 +14,5 @@
 ## Next
 - Demo GIF for the README (asciinema/vhs of `init` + `run`).
 - Install codex/gemini and run all four agents on a real repo; fix the adapters.
-- (Done 2026-10-26) Published `benchmyrepo@0.1.0` to npm, tagged v0.1.0. `repobench` was taken, hence the rename. The GitHub repo is still private, so the npm page's repo link 404s until it's made public.
+- (Done 2026-10-26) Published `benchmyrepo@0.1.0` to npm, tagged v0.1.0. `repobench` was taken, hence the rename. GitHub repo made public the same day.
 - Ideas: `--since` defaulting per model cutoff, a GitHub Action that posts the card, flaky-test rerun during validation.
