@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="290" viewBox="0 0 800 290" role="img" aria-label="benchmyrepo leaderboard for click">
+<style>
+  .bg{fill:#fbfaf7} .fg{fill:#16181d} .muted{fill:#6b6f76} .track{fill:#ebe8e1} .bar{fill:#8a8f98} .lead{fill:#d9531e}
+  text{font-family:ui-sans-serif,-apple-system,"Segoe UI",Inter,Helvetica,Arial,sans-serif;fill:#16181d}
+  .title{font-size:26px;font-weight:700} .kicker{font-size:13px;fill:#6b6f76;letter-spacing:.06em}
+  .rank{font-size:15px;fill:#6b6f76;font-variant-numeric:tabular-nums} .name{font-size:17px;font-weight:600}
+  .sub{font-size:11px;fill:#6b6f76} .pct{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+  .meta{font-size:13px;fill:#6b6f76;font-variant-numeric:tabular-nums} .foot{font-size:12px;fill:#6b6f76}
+  @media (prefers-color-scheme: dark){
+    .bg{fill:#14161a} text{fill:#eceae4} .kicker,.rank,.sub,.meta,.foot{fill:#9a9ea6} .track{fill:#262a31} .bar{fill:#5d636d} .lead{fill:#f0703a}
+  }
+</style>
+<rect class="bg" width="800" height="290" rx="14"/>
+<text x="40" y="44" class="kicker">BENCHMYREPO · 8 REAL PRS · GRADED BY THEIR OWN TESTS</text>
+<text x="40" y="80" class="title">Which agent fixes click?</text>
+<g transform="translate(0 108)">
+  <text x="40" y="22" class="rank">1</text>
+  <text x="70" y="22" class="name">claude:sonnet</text>
+  <text x="70" y="38" class="sub">claude-sonnet-5-5</text>
+  <rect x="250" y="8" width="330" height="20" rx="4" class="track"/>
+  <rect x="250" y="8" width="83" height="20" rx="4" class="bar lead"/>
+  <text x="596" y="24" class="pct">25%</text>
+  <text x="760" y="24" class="meta" text-anchor="end">2/8 · $0.89</text>
+</g>
+<g transform="translate(0 154)">
+  <text x="40" y="22" class="rank">1</text>
+  <text x="70" y="22" class="name">claude:opus</text>
+  <text x="70" y="38" class="sub">claude-opus-5-5</text>
+  <rect x="250" y="8" width="330" height="20" rx="4" class="track"/>
+  <rect x="250" y="8" width="83" height="20" rx="4" class="bar lead"/>
+  <text x="596" y="24" class="pct">25%</text>
+  <text x="760" y="24" class="meta" text-anchor="end">2/8 · $2.94</text>
+</g>
+<g transform="translate(0 200)">
+  <text x="40" y="22" class="rank">3</text>
+  <text x="70" y="22" class="name">claude:haiku</text>
+  <text x="70" y="38" class="sub">claude-haiku-5-5</text>
+  <rect x="250" y="8" width="330" height="20" rx="4" class="track"/>
+  <rect x="250" y="8" width="2" height="20" rx="4" class="bar"/>
+  <text x="596" y="24" class="pct">0%</text>
+  <text x="760" y="24" class="meta" text-anchor="end">0/8 · $0.10</text>
+</g>
+<text x="40" y="270" class="foot">npx benchmyrepo · run 2026-11-12_23-29-03</text>
+</svg>

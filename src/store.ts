@@ -33,6 +33,8 @@ export interface Task {
   testFiles: string[];
   /** Test files the PR touched that already existed at base (modified or deleted). */
   testFilesAtBase: string[];
+  /** Helpers, fixtures and snapshots the PR added or changed next to its tests: installed, not run. */
+  testSupportFiles?: string[];
   sourceFiles: string[];
   goldLines: number;
   validatedAt: string;
@@ -61,6 +63,10 @@ export interface RunMeta {
   agents: string[];
   taskIds: string[];
   yolo: boolean;
+  /** benchmyrepo version that made the run. */
+  tool?: string;
+  /** `--version` output of each agent CLI, by binary name. */
+  agentVersions?: Record<string, string>;
 }
 
 export class Store {
@@ -132,6 +138,12 @@ export class Store {
   readRejected(): Record<string, string> {
     const p = join(this.dir, "rejected.json");
     return existsSync(p) ? JSON.parse(readFileSync(p, "utf8")) : {};
+  }
+
+  /** Test output for a rejected candidate, so "fails even with the fix" can be diagnosed. */
+  saveRejectedLog(id: string, text: string) {
+    mkdirSync(join(this.dir, "rejected"), { recursive: true });
+    writeFileSync(join(this.dir, "rejected", `${id}.log`), text);
   }
 
   writeRejected(r: Record<string, string>) {

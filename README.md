@@ -7,13 +7,18 @@ npx benchmyrepo init        # turn merged PRs into tasks
 npx benchmyrepo run         # run every installed agent on them
 ```
 
+### A real run: pallets/click, 2026-11-12
+
+[![benchmyrepo leaderboard for pallets/click](docs/first-run/leaderboard.svg)](docs/first-run.md)
+
 ```
-#  agent          solved  rate  cost    $/solve  median
-1  codex          8/12    67%   $5.13   $0.64    2.8m
-2  claude:opus    8/12    67%   $6.91   $0.86    3.1m
-3  gemini         7/12    58%   $2.16   $0.31    2.2m
+#  agent          solved  rate  cost   $/solve  median
+1  claude:sonnet  2/8     25%   $0.89  $0.44    23s
+1  claude:opus    2/8     25%   $2.94  $1.47    59s
+3  claude:haiku   0/8     0%    $0.10  —        48s
 ```
-<sub>Example output. Your numbers come from your repo.</sub>
+
+Three Claude models (Claude Code 2.1.310: `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5`) on 8 [click](https://github.com/pallets/click) PRs merged from 2026-09-12 to 2026-11-12. Agents could edit files but not run commands. **This is one run on 8 tasks.** Sonnet and Opus solved the same 2 tasks and are tied; a sample this small can't rank them. Cost is the CLI's API-price estimate; the run used a subscription. The tasks were merged after Claude Opus 5.5's documented June 2026 knowledge cutoff; the Sonnet 5.5 and Haiku 5.5 cutoffs aren't verified. Full details, the task list, a hand check of the grader and the limitations are in [docs/first-run.md](docs/first-run.md).
 
 You get a single-file `report.html`, a `leaderboard.svg` card to share, and a `badge.svg` for your README.
 
@@ -44,6 +49,7 @@ npx benchmyrepo doctor
 
 - `agent:model` picks a model, for example `claude:opus` or `codex:gpt-5.5`.
 - `--yolo` lets agents run shell commands such as your test suite without asking. Without it, Claude runs with edit permissions only, Codex runs in its workspace sandbox, and Gemini auto-approves edits only. Agents run on your machine, so only use `--yolo` on code you trust.
+- Claude runs with `--setting-sources project,local`, so your personal hooks, `CLAUDE.md` and plugins don't change the result; the repo's own `.claude/` settings still apply. If you start benchmyrepo from inside an agent session, that session's variables aren't passed on to the agents.
 - `--resume <runId>` continues an interrupted run.
 
 ### Custom agents
@@ -59,13 +65,15 @@ Add any CLI to `.benchmyrepo/config.json`:
 | | |
 |---|---|
 | Test runners | vitest, jest, mocha, `npm test`, `node --test`, pytest, `go test`, `cargo test` (or any command via `--test-cmd`) |
-| Agents | Claude Code (tested), Codex, Gemini CLI, cursor-agent (adapters written, not yet tested against live CLIs), custom |
+| Agents | Claude Code (tested on a real third-party repo, [pallets/click](docs/first-run.md)), Codex, Gemini CLI, cursor-agent (adapters written, not yet tested against the live CLIs), custom |
 | Platforms | macOS, Linux; Node 20+ |
 
 ## Limitations
 
 - PRs without tests can't become tasks. On many repos, most PRs get skipped (dependency bumps, docs).
 - Public repos may be in a model's training data. Use `--since` to keep only PRs merged after a model's cutoff.
+- Agents only get the PR description, but they are graded on every assertion in the PR's tests. Some of those check details the description never states, so a failure doesn't always mean broken code.
+- A handful of tasks gives a rough signal, not a ranking. Look at the raw counts, and don't read a one-task difference as a win.
 - Monorepos with per-package dependencies work if their `node_modules` are installed. PRs that change dependencies are skipped.
 - Git submodules aren't copied into workspaces.
 

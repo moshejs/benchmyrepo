@@ -45,6 +45,20 @@ function mode(xs: string[]): string | undefined {
   return [...c.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
 }
 
+/**
+ * Competition ranking on solve rate: agents with the same rate share a rank ("1, 1, 3").
+ * Cost and time only order rows within a tie; they don't make a winner.
+ */
+export function rankOf(stats: AgentStats[], i: number): number {
+  return 1 + stats.filter((s) => s.rate > stats[i].rate).length;
+}
+
+/** Agents sharing the top solve rate (none if nobody solved anything). */
+export function leaders(stats: AgentStats[]): AgentStats[] {
+  if (!stats.length || stats[0].rate === 0) return [];
+  return stats.filter((s) => s.rate === stats[0].rate);
+}
+
 export const pct = (r: number) => `${Math.round(r * 100)}%`;
 const money = (n?: number) => (n === undefined ? "—" : n < 0.01 && n > 0 ? "<$0.01" : `$${n.toFixed(2)}`);
 const dur = (ms: number) => (ms < 60_000 ? `${Math.round(ms / 1000)}s` : `${(ms / 60_000).toFixed(1)}m`);
@@ -54,7 +68,7 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 export function terminalTable(stats: AgentStats[]): string {
   const rows = [["#", "agent", "solved", "rate", "cost", "$/solve", "median"]];
   stats.forEach((s, i) =>
-    rows.push([String(i + 1), s.agent, `${s.solved}/${s.attempted}`, pct(s.rate), money(s.costUsd), money(s.costPerSolve), dur(s.medianMs)]),
+    rows.push([String(rankOf(stats, i)), s.agent, `${s.solved}/${s.attempted}`, pct(s.rate), money(s.costUsd), money(s.costPerSolve), dur(s.medianMs)]),
   );
   const w = rows[0].map((_, c) => Math.max(...rows.map((r) => r[c].length)));
   return rows.map((r) => r.map((cell, c) => cell.padEnd(w[c])).join("  ")).join("\n");
@@ -76,8 +90,9 @@ export function writeReport(runDir: string, meta: RunMeta, tasks: Task[], result
     markdown: join(runDir, "summary.md"),
   };
   writeFileSync(files.html, renderHtml(meta, tasks, results, stats));
-  writeFileSync(files.card, renderCard(meta, stats, tasks.length));
-  writeFileSync(files.badge, renderBadge(stats[0]));
+  // Count the tasks this run attempted, not every task in .benchmyrepo/tasks.
+  writeFileSync(files.card, renderCard(meta, stats, new Set(results.map((r) => r.taskId)).size));
+  writeFileSync(files.badge, renderBadge(stats));
   writeFileSync(files.markdown, renderMarkdown(meta, stats));
   return files;
 }
@@ -90,15 +105,18 @@ function renderMarkdown(meta: RunMeta, stats: AgentStats[]): string {
     "",
     "| # | Agent | Solved | Rate | Cost | Median time |",
     "|---|---|---|---|---|---|",
-    ...stats.map((s, i) => `| ${i + 1} | ${s.agent}${s.model ? ` (${s.model})` : ""} | ${s.solved}/${s.attempted} | **${pct(s.rate)}** | ${money(s.costUsd)} | ${dur(s.medianMs)} |`),
+    ...stats.map((s, i) => `| ${rankOf(stats, i)} | ${s.agent}${s.model ? ` (${s.model})` : ""} | ${s.solved}/${s.attempted} | **${pct(s.rate)}** | ${money(s.costUsd)} | ${dur(s.medianMs)} |`),
     "",
   ];
   return lines.join("\n");
 }
 
-export function renderBadge(top?: AgentStats): string {
+export function renderBadge(stats: AgentStats[] | AgentStats | undefined): string {
+  const list = Array.isArray(stats) ? stats : stats ? [stats] : [];
+  const top = list[0];
+  const lead = leaders(list);
   const left = "benchmyrepo";
-  const right = top ? `${top.agent} ${pct(top.rate)}` : "no runs";
+  const right = !top ? "no runs" : `${(lead.length ? lead : [top]).map((s) => s.agent).join(", ")} ${pct(top.rate)}`;
   const cw = (s: string) => Math.round(s.length * 6.6 + 12);
   const lw = cw(left);
   const rw = cw(right);
@@ -121,16 +139,17 @@ export function renderCard(meta: RunMeta, stats: AgentStats[], taskCount: number
   const H = top + Math.max(1, stats.length) * rowH + 44;
   const barX = 250;
   const barW = 330;
+  const lead = leaders(stats);
   const rows = stats
     .map((s, i) => {
       const y = top + i * rowH;
       const w = Math.max(2, Math.round(barW * s.rate));
       return `<g transform="translate(0 ${y})">
-  <text x="40" y="22" class="rank">${i + 1}</text>
+  <text x="40" y="22" class="rank">${rankOf(stats, i)}</text>
   <text x="70" y="22" class="name">${esc(s.agent)}</text>
   ${s.model ? `<text x="70" y="38" class="sub">${esc(s.model)}</text>` : ""}
   <rect x="${barX}" y="8" width="${barW}" height="20" rx="4" class="track"/>
-  <rect x="${barX}" y="8" width="${w}" height="20" rx="4" class="${i === 0 ? "bar lead" : "bar"}"/>
+  <rect x="${barX}" y="8" width="${w}" height="20" rx="4" class="${lead.includes(s) ? "bar lead" : "bar"}"/>
   <text x="${barX + barW + 16}" y="24" class="pct">${pct(s.rate)}</text>
   <text x="${W - 40}" y="24" class="meta" text-anchor="end">${s.solved}/${s.attempted} · ${money(s.costUsd)}</text>
 </g>`;
@@ -157,6 +176,13 @@ ${rows}
 `;
 }
 
+function versionsLine(meta: RunMeta): string {
+  const parts: string[] = [];
+  if (meta.tool) parts.push(`benchmyrepo ${esc(meta.tool)}`);
+  for (const [bin, v] of Object.entries(meta.agentVersions ?? {})) parts.push(`<code>${esc(bin)}</code> ${esc(v)}`);
+  return parts.length ? `<li>Versions: ${parts.join(", ")}. Started ${esc(meta.startedAt.slice(0, 16).replace("T", " "))} UTC.</li>` : "";
+}
+
 function headline(stats: AgentStats[], repo: string): string {
   if (!stats.length) return `No results yet for ${esc(repo)}`;
   const tied = stats.filter((s) => s.rate === stats[0].rate);
@@ -181,8 +207,8 @@ export function renderHtml(meta: RunMeta, tasks: Task[], results: RunResult[], s
 
   const leaderRows = stats
     .map(
-      (s, i) => `<tr${i === 0 ? ' class="lead"' : ""}>
-  <td class="rank">${i + 1}</td>
+      (s, i) => `<tr${leaders(stats).includes(s) ? ' class="lead"' : ""}>
+  <td class="rank">${rankOf(stats, i)}</td>
   <td><div class="agent">${esc(s.agent)}</div>${s.model ? `<div class="model">${esc(s.model)}</div>` : ""}</td>
   <td class="barcell"><div class="bar"><span style="width:${(s.rate * 100).toFixed(1)}%"></span></div></td>
   <td class="num big">${pct(s.rate)}</td>
@@ -329,6 +355,7 @@ ${matrixRows}
     <li>Agents work in a throwaway copy with no git history, so they can't look up the real fix.</li>
     <li>After the agent finishes, the PR's test files are restored to their merged versions and run.</li>
     <li>Cost is what each agent CLI reports; subscription plans may not report it.</li>
+    ${versionsLine(meta)}
   </ul>
   <footer>Generated by <code>npx benchmyrepo</code>. Logs and patches for every attempt are in <code>.benchmyrepo/runs/${esc(meta.runId)}/logs</code>.</footer>
 </main>

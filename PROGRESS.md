@@ -7,9 +7,12 @@
 - Phase 4 (partial): README, MIT license, `npm pack` works (25.6 kB).
 - Verified: `npm test` (unit + fixture end-to-end with fake agents); real `claude` run on the fixture (2/2, $0.37); `init` on pallets/markupsafe found 3 valid tasks from 150 PRs in about 5s.
 
+- (2026-11-12) First real run on a third-party repo: pallets/click, 8 tasks, claude:opus/sonnet/haiku. Sonnet 2/8, Opus 2/8, Haiku 0/8, $3.93 reported. All 24 grades re-checked by hand. Seven bugs found and fixed (branch-merge PRs, helper files run as tests, inherited session env, user Claude settings, commits hiding the diff, card task count, ties shown as wins). Added CI. See docs/first-run.md.
+
 ## Not verified
 - codex, gemini and cursor-agent adapters (those CLIs aren't installed here). Flags come from their docs and may need adjusting.
-- Real agent runs on a real third-party repo (blocked by the local auto-mode guard on running external code).
+- Repeat runs (variance) and runs with `--yolo` on a real repo.
+- Fixes since 0.1.0 are unreleased on npm.
 
 ## Next
 - Demo GIF for the README (asciinema/vhs of `init` + `run`).

@@ -40,6 +40,32 @@ export function isTestFile(path: string): boolean {
   return TEST_PATTERNS.some((re) => re.test(path));
 }
 
+/** File names test runners pick up on their own. */
+const RUNNABLE_NAME = [
+  /\.(test|spec)\.[cm]?[jt]sx?$/,
+  /(^|\/)test_[^/]*\.py$/,
+  /_test\.py$/,
+  /_test\.go$/,
+  /_spec\.rb$/,
+];
+/** Directories under a test dir that hold helpers and data, not tests. */
+const SUPPORT_DIR = /(^|\/)(__snapshots__|__fixtures__|fixtures?|support|helpers?|testdata|data|utils|mocks?|__mocks__|typing)\//;
+const JS_FILE = /\.[cm]?[jt]sx?$/;
+
+/**
+ * A test file the runner should be pointed at, as opposed to a helper, fixture,
+ * snapshot or conftest that lives next to the tests. Passing helpers to a runner
+ * explicitly makes it collect them as tests (pytest does), which fails tasks for
+ * reasons unrelated to the fix.
+ */
+export function isRunnableTest(path: string): boolean {
+  if (!isTestFile(path)) return false;
+  if (/(^|\/)conftest\.py$/.test(path) || /(^|\/)__snapshots__\//.test(path)) return false;
+  if (RUNNABLE_NAME.some((re) => re.test(path))) return true;
+  // mocha/tap/node --test layouts: plain .js files in test/ are tests unless they sit in a helper dir.
+  return JS_FILE.test(path) && !SUPPORT_DIR.test(path.replace(/^(.*?\/)?(__tests__|tests?|spec|specs)\//, "/"));
+}
+
 export function isManifest(path: string): boolean {
   const base = path.split("/").pop() ?? path;
   return MANIFEST_NAMES.has(base) || /^requirements[^/]*\.txt$/.test(base);

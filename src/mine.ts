@@ -2,7 +2,7 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { exec, must, pool, tail } from "./exec.js";
-import { parseNameStatus, splitChanges } from "./files.js";
+import { isRunnableTest, parseNameStatus, splitChanges } from "./files.js";
 import type { Config, Store, Task } from "./store.js";
 import { applyPatch, createWorkspace, installTests, removeWorkspace, runTests } from "./workspace.js";
 
@@ -15,6 +15,8 @@ export interface Candidate {
   commit: string;
   mergedAt: string;
   issueNumbers: number[];
+  /** The PR's source branch, when known. */
+  headRef?: string;
 }
 
 export interface MineOptions {
@@ -30,7 +32,7 @@ export async function listCandidates(repoRoot: string, opts: MineOptions): Promi
 }
 
 async function githubCandidates(repoRoot: string, limit: number): Promise<Candidate[]> {
-  const fields = "number,title,body,mergeCommit,mergedAt,url";
+  const fields = "number,title,body,mergeCommit,mergedAt,url,headRefName";
   let r = await exec("gh", ["pr", "list", "--state", "merged", "--limit", String(limit), "--json", `${fields},closingIssuesReferences`], { cwd: repoRoot });
   if (r.code !== 0 && /closingIssuesReferences/.test(r.stderr)) {
     r = await exec("gh", ["pr", "list", "--state", "merged", "--limit", String(limit), "--json", fields], { cwd: repoRoot });
@@ -43,6 +45,7 @@ async function githubCandidates(repoRoot: string, limit: number): Promise<Candid
     mergeCommit: { oid: string } | null;
     mergedAt: string;
     url: string;
+    headRefName?: string;
     closingIssuesReferences?: Array<{ number: number }>;
   }>;
   return prs
@@ -56,6 +59,7 @@ async function githubCandidates(repoRoot: string, limit: number): Promise<Candid
       commit: p.mergeCommit!.oid,
       mergedAt: p.mergedAt,
       issueNumbers: (p.closingIssuesReferences ?? []).map((i) => i.number),
+      headRef: p.headRefName,
     }));
 }
 
@@ -86,9 +90,21 @@ async function gitCandidates(repoRoot: string, limit: number): Promise<Candidate
   return list;
 }
 
+/**
+ * A PR that merges one long-lived branch into another ("Merge stable into main") bundles
+ * many changes that were already PRs of their own, and its description doesn't say what to build.
+ */
+export function isBranchSync(c: Pick<Candidate, "title" | "headRef">): boolean {
+  const head = c.headRef ?? "";
+  if (/^(main|master|stable|develop|development|dev|trunk|next|release|releases|production|staging)$/i.test(head)) return true;
+  if (/^(release|releases|stable|hotfix)[-/]\d/i.test(head) || /^v?\d+(\.\d+)*(\.x)?$/i.test(head)) return true;
+  return /^Merge (branch|remote-tracking branch|(\S+ )?into) /i.test(c.title) || /^Merge \S+ into \S+$/i.test(c.title);
+}
+
 export type Built = { task: Task; testsPatch: string; goldPatch: string } | { rejected: string };
 
 export async function buildTask(repoRoot: string, c: Candidate, opts: MineOptions): Promise<Built> {
+  if (isBranchSync(c)) return { rejected: "merges one branch into another" };
   if ((await exec("git", ["cat-file", "-e", `${c.commit}^{commit}`], { cwd: repoRoot })).code !== 0) {
     await exec("git", ["fetch", "-q", "origin", c.commit], { cwd: repoRoot });
     if ((await exec("git", ["cat-file", "-e", `${c.commit}^{commit}`], { cwd: repoRoot })).code !== 0) {
@@ -101,8 +117,9 @@ export async function buildTask(repoRoot: string, c: Candidate, opts: MineOption
 
   const changes = parseNameStatus(await must("git", ["diff", "--name-status", "-M", base, c.commit], { cwd: repoRoot }));
   const split = splitChanges(changes);
-  const runnable = split.tests.filter((t) => t.status !== "D");
-  if (!runnable.length) return { rejected: "no test changes" };
+  if (!split.tests.some((t) => t.status !== "D")) return { rejected: "no test changes" };
+  const runnable = split.tests.filter((t) => t.status !== "D" && isRunnableTest(t.path));
+  if (!runnable.length) return { rejected: "no runnable test files (only helpers or fixtures changed)" };
   if (!split.source.length) return { rejected: "no source changes" };
   if (split.manifests.length) return { rejected: `changes dependencies (${split.manifests.map((m) => m.path).join(", ")})` };
 
@@ -132,6 +149,7 @@ export async function buildTask(repoRoot: string, c: Candidate, opts: MineOption
       mergedAt: c.mergedAt,
       testFiles: [...new Set(runnable.map((t) => t.path))],
       testFilesAtBase: [...new Set(atBase)],
+      testSupportFiles: [...new Set(split.tests.filter((t) => t.status !== "D" && !isRunnableTest(t.path)).map((t) => t.path))],
       sourceFiles: split.source.map((s) => s.path),
       goldLines,
       validatedAt: "",
@@ -182,7 +200,7 @@ export async function validateTask(repoRoot: string, config: Config, task: Task,
     await installTests(dir, task, testsPatch);
     const before = await runTests(dir, config, task);
     if (before.timedOut) return { ok: false, reason: "tests time out" };
-    if (before.code === 0) return { ok: false, reason: "tests already pass without the fix" };
+    if (before.code === 0) return { ok: false, reason: "tests already pass without the fix", log: tail(before.stdout + before.stderr, 1500) };
     await applyPatch(dir, goldPatch);
     const after = await runTests(dir, config, task);
     if (after.timedOut) return { ok: false, reason: "tests time out with the fix" };
@@ -207,7 +225,7 @@ export async function mineAndValidate(
   config: Config,
   opts: MineOptions & { concurrency: number; want: number },
   log: InitProgress,
-): Promise<{ added: Task[]; rejected: Record<string, number> }> {
+): Promise<{ added: Task[]; rejected: Record<string, number>; funnel: Funnel }> {
   const candidates = await listCandidates(repoRoot, opts);
   log(`Found ${candidates.length} merged ${opts.source === "github" ? "PRs" : "commits"} to check.`);
   const rejectedStore = store.readRejected();
@@ -215,23 +233,31 @@ export async function mineAndValidate(
   const added: Task[] = [];
   const existing = store.listTasks().length;
   const todo = candidates.filter((c) => !store.hasTask(c.id) && !rejectedStore[`${c.id}@${c.commit}`]);
+  const funnel: Funnel = { scanned: candidates.length, known: candidates.length - todo.length, examined: 0, eligible: 0, validated: 0, notExamined: 0 };
 
   await pool(todo, opts.concurrency, async (c) => {
-    if (existing + added.length >= opts.want) return;
+    if (existing + added.length >= opts.want) {
+      funnel.notExamined++;
+      return;
+    }
+    funnel.examined++;
     const built = await buildTask(repoRoot, c, opts);
     if ("rejected" in built) {
       counts[built.rejected.replace(/ \(.*\)$/, "")] = (counts[built.rejected.replace(/ \(.*\)$/, "")] ?? 0) + 1;
       rejectedStore[`${c.id}@${c.commit}`] = built.rejected;
       return;
     }
+    funnel.eligible++;
     log(`  checking ${c.id}: ${c.title.slice(0, 70)}`);
     const v = await validateTask(repoRoot, config, built.task, built.testsPatch, built.goldPatch);
     if (!v.ok) {
       counts[v.reason!] = (counts[v.reason!] ?? 0) + 1;
       rejectedStore[`${c.id}@${c.commit}`] = v.reason!;
-      log(`    ✗ ${c.id}: ${v.reason}`);
+      if (v.log) store.saveRejectedLog(c.id, v.log);
+      log(`    ✗ ${c.id}: ${v.reason}${v.log ? ` (log: .benchmyrepo/rejected/${c.id}.log)` : ""}`);
       return;
     }
+    funnel.validated++;
     if (existing + added.length >= opts.want) return;
     built.task.validatedAt = new Date().toISOString();
     store.saveTask(built.task, built.testsPatch, built.goldPatch);
@@ -239,5 +265,29 @@ export async function mineAndValidate(
     log(`    ✓ task ${c.id} (${built.task.testFiles.length} test file(s), ${built.task.goldLines}-line fix)`);
   });
   store.writeRejected(rejectedStore);
-  return { added, rejected: counts };
+  return { added, rejected: counts, funnel };
+}
+
+/** How many candidates made it through each stage of one `init`. */
+export interface Funnel {
+  /** Merged PRs (or commits) listed, after --since. */
+  scanned: number;
+  /** Already a task or already rejected by an earlier init. */
+  known: number;
+  /** Looked at this time. */
+  examined: number;
+  /** Changed source + tests, no dependencies, under the size cap. */
+  eligible: number;
+  /** Tests failed before the fix and passed with it. */
+  validated: number;
+  /** Not looked at because --tasks was already reached. */
+  notExamined: number;
+}
+
+export function formatFunnel(f: Funnel, unit: string): string {
+  const parts = [`${f.scanned} ${unit} scanned`];
+  if (f.known) parts.push(`${f.known} seen in an earlier init`);
+  parts.push(`${f.examined} examined`, `${f.eligible} changed source + tests`, `${f.validated} validated`);
+  if (f.notExamined) parts.push(`${f.notExamined} not examined (--tasks reached)`);
+  return parts.join(" → ");
 }
