@@ -14,6 +14,9 @@ const GIT_ENV = {
   GIT_COMMITTER_EMAIL: "benchmyrepo@localhost",
 };
 
+/** The workspace's starting commit. Diffs and test restores are taken against it, not HEAD. */
+export const BASE_TAG = "benchmyrepo-base";
+
 export async function createWorkspace(repoRoot: string, sha: string, dir: string, config: Config): Promise<void> {
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
@@ -21,6 +24,8 @@ export async function createWorkspace(repoRoot: string, sha: string, dir: string
   await must("git", ["init", "-q", "-b", "main"], { cwd: dir });
   await must("git", ["add", "-A"], { cwd: dir });
   await must("git", ["commit", "-q", "--no-verify", "--allow-empty", "-m", "base"], { cwd: dir, env: GIT_ENV });
+  // Tag the starting point: an agent may commit (or reset), so HEAD can't be trusted later.
+  await must("git", ["tag", BASE_TAG], { cwd: dir });
 
   const excludes: string[] = [];
   for (const rel of config.linkDirs) {
@@ -38,11 +43,11 @@ export function removeWorkspace(dir: string) {
   rmSync(dir, { recursive: true, force: true });
 }
 
-/** Everything the agent changed, as a patch against the base commit. */
+/** Everything the agent changed, committed or not, as a patch against the base commit. */
 export async function captureDiff(dir: string): Promise<{ patch: string; lines: number }> {
   await must("git", ["add", "-A"], { cwd: dir });
-  const patch = await must("git", ["diff", "--cached", "--binary", "HEAD"], { cwd: dir });
-  const stat = await must("git", ["diff", "--cached", "--numstat", "HEAD"], { cwd: dir });
+  const patch = await must("git", ["diff", "--cached", "--binary", BASE_TAG], { cwd: dir });
+  const stat = await must("git", ["diff", "--cached", "--numstat", BASE_TAG], { cwd: dir });
   let lines = 0;
   for (const l of stat.split("\n")) {
     const [a, d] = l.split("\t");
@@ -57,9 +62,9 @@ export async function captureDiff(dir: string): Promise<{ patch: string; lines: 
  */
 export async function installTests(dir: string, task: Task, testsPatch: string): Promise<void> {
   for (const f of task.testFilesAtBase) {
-    await must("git", ["checkout", "HEAD", "--", f], { cwd: dir });
+    await must("git", ["checkout", BASE_TAG, "--", f], { cwd: dir });
   }
-  for (const f of task.testFiles) {
+  for (const f of [...task.testFiles, ...(task.testSupportFiles ?? [])]) {
     if (!task.testFilesAtBase.includes(f) && existsSync(join(dir, f))) unlinkSync(join(dir, f));
   }
   const r = await exec("git", ["apply", "--whitespace=nowarn", "-"], { cwd: dir, input: testsPatch });

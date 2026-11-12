@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildPrompt, resolveAgent, runAgent, setPromptDir, type AgentSpec } from "./agents.js";
-import { pool, tail } from "./exec.js";
+import { exec, pool, tail } from "./exec.js";
 import type { Config, RunResult, Store, Task } from "./store.js";
 import { captureDiff, createWorkspace, installTests, removeWorkspace, runTests } from "./workspace.js";
 
@@ -36,6 +36,8 @@ export async function runBenchmark(repoRoot: string, store: Store, config: Confi
       agents: o.agents,
       taskIds: o.tasks.map((t) => t.id),
       yolo: o.yolo,
+      tool: toolVersion(),
+      agentVersions: await agentVersions(specs),
     });
   }
 
@@ -52,6 +54,24 @@ export async function runBenchmark(repoRoot: string, store: Store, config: Confi
     log(`  [${finished}/${jobs.length}] ${mark} ${spec.label.padEnd(14)} ${task.id.padEnd(16)} ${r.status} ${(r.agentMs / 1000).toFixed(0)}s${cost}`);
   });
   return runId;
+}
+
+export function toolVersion(): string {
+  try {
+    return JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")).version;
+  } catch {
+    return "unknown";
+  }
+}
+
+async function agentVersions(specs: AgentSpec[]): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  for (const s of specs) {
+    if (s.bin === "sh" || out[s.bin]) continue;
+    const r = await exec(s.bin, ["--version"], { timeoutMs: 30_000 });
+    out[s.bin] = r.code === 0 ? r.stdout.trim().split("\n")[0] : "unknown";
+  }
+  return out;
 }
 
 async function runOne(repoRoot: string, store: Store, config: Config, task: Task, spec: AgentSpec, o: RunOptions, runDir: string): Promise<RunResult> {

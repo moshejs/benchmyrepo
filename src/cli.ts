@@ -1,8 +1,8 @@
 import { parseArgs } from "node:util";
 import { exec, must, which } from "./exec.js";
-import { BUILTIN_AGENTS, installedAgents } from "./agents.js";
+import { agentEnv, BUILTIN_AGENTS, installedAgents } from "./agents.js";
 import { detect } from "./detect.js";
-import { mineAndValidate } from "./mine.js";
+import { formatFunnel, mineAndValidate } from "./mine.js";
 import { runBenchmark } from "./run.js";
 import { computeStats, terminalTable, writeReport } from "./report.js";
 import { Store } from "./store.js";
@@ -95,7 +95,7 @@ async function init(root: string, store: Store, argv: string[]): Promise<number>
 
   const source = (values.source as "github" | "git" | undefined) ?? ((await hasGithub(root)) ? "github" : "git");
   log(`Mining ${source === "github" ? "merged PRs with gh" : "first-parent commits with git"}…`);
-  const { added, rejected } = await mineAndValidate(
+  const { added, rejected, funnel } = await mineAndValidate(
     root,
     store,
     config,
@@ -111,6 +111,7 @@ async function init(root: string, store: Store, argv: string[]): Promise<number>
   );
   const total = store.listTasks().length;
   log("");
+  log(`Funnel: ${formatFunnel(funnel, source === "github" ? "PRs" : "commits")}`);
   log(`Added ${added.length} task(s); ${total} total in .benchmyrepo/tasks.`);
   const skipped = Object.entries(rejected).sort((a, b) => b[1] - a[1]);
   if (skipped.length) log(`Skipped: ${skipped.map(([k, v]) => `${v} ${k}`).join(", ")}`);
@@ -212,13 +213,34 @@ async function report(store: Store, argv: string[]): Promise<number> {
   return 0;
 }
 
+/** Whether `claude` is signed in, without printing who. */
+async function claudeAuth(): Promise<string> {
+  const r = await exec("claude", ["auth", "status"], { timeoutMs: 30_000, env: agentEnv() });
+  try {
+    const j = JSON.parse(r.stdout);
+    if (!j.loggedIn) return "not signed in: run `claude` once and log in";
+    return `signed in (${[j.authMethod, j.subscriptionType].filter(Boolean).join(", ")})`;
+  } catch {
+    return r.code === 0 ? "sign-in status unknown" : "could not check sign-in (`claude auth status` failed)";
+  }
+}
+
 async function doctor(root: string, store: Store): Promise<number> {
-  log(`repo:      ${root}`);
-  log(`git:       ${(await must("git", ["--version"])).trim()}`);
-  log(`gh:        ${(await which("gh")) ? ((await hasGithub(root)) ? "ok, repo found on GitHub" : "installed, repo not on GitHub (will use --source git)") : "not installed (will use --source git)"}`);
-  for (const a of BUILTIN_AGENTS) log(`${(a + ":").padEnd(11)}${(await which(a)) ?? "not found"}`);
+  log(`repo:         ${root}`);
+  log(`git:          ${(await must("git", ["--version"])).trim()}`);
+  log(`gh:           ${(await which("gh")) ? ((await hasGithub(root)) ? "ok, repo found on GitHub" : "installed, repo not on GitHub (will use --source git)") : "not installed (will use --source git)"}`);
+  for (const a of BUILTIN_AGENTS) {
+    const path = await which(a);
+    let line = path ?? "not found";
+    if (path) {
+      const v = await exec(a, ["--version"], { timeoutMs: 30_000 });
+      if (v.code === 0 && v.stdout.trim()) line += `  (${v.stdout.trim().split("\n")[0]})`;
+      if (a === "claude") line += `\n${"".padEnd(14)}${await claudeAuth()}`;
+    }
+    log(`${(a + ":").padEnd(14)}${line}`);
+  }
   const c = store.readConfig() ?? detect(root).config;
-  log(`tests:     ${c.testCommand || "not detected"}`);
-  log(`tasks:     ${store.listTasks().length}`);
+  log(`tests:        ${c.testCommand || "not detected"}`);
+  log(`tasks:        ${store.listTasks().length}`);
   return 0;
 }

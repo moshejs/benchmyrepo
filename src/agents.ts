@@ -31,6 +31,12 @@ const BUILTIN: Record<string, Omit<AgentSpec, "label">> = {
       "json",
       "--permission-mode",
       o.yolo ? "bypassPermissions" : "acceptEdits",
+      // Benchmark the model and the CLI, not your personal setup: user-level settings
+      // (hooks, CLAUDE.md, plugins, default model) are skipped; the repo's own
+      // .claude/ settings still apply. Don't add these runs to your session history.
+      "--setting-sources",
+      "project,local",
+      "--no-session-persistence",
       ...(o.model ? ["--model", o.model] : []),
     ],
     parse(r) {
@@ -154,11 +160,36 @@ export function buildPrompt(instruction: string): string {
   ].join("\n");
 }
 
+/**
+ * Variables Claude Code sets for the processes it spawns. When benchmyrepo itself runs
+ * inside an agent session (say, Claude Code ran it for you), they'd leak into every agent
+ * it launches and mark it as a child of that session. Configuration variables people set
+ * on purpose (CLAUDE_CODE_USE_BEDROCK, ANTHROPIC_API_KEY, CLAUDE_CODE_MAX_OUTPUT_TOKENS…)
+ * are kept.
+ */
+const SESSION_VARS = [
+  /^CLAUDECODE$/,
+  /^CLAUDE_PID$/,
+  /^CLAUDE_EFFORT$/,
+  /^CLAUDE_AGENT_SDK_/,
+  /^CLAUDE_CODE_(ENTRYPOINT|SESSION_ID|HOST_SESSION_ID|CHILD_SESSION|SESSION_ATTENDED|SIMPLE|EXECPATH|SSE_PORT)$/,
+  /^CLAUDE_CODE_(MESSAGING|DESKTOP|EMIT|HOST|SDK|STARTUP|REPORT|TERMINAL)_/,
+  /^CLAUDE_CODE_(ENABLE_SDK_FILE_CHECKPOINTING|ENABLE_ASK_USER_QUESTION_TOOL|DISABLE_CRON|EAGER_FLUSH|DISABLE_TERMINAL_TITLE|INVOKED_SKILLS|OAUTH_SCOPES|ORGANIZATION_UUID|ACCOUNT_UUID|USER_EMAIL)$/,
+  /^CLAUDE_PREVIEW_/,
+  /^MCP_(CONNECTION_NONBLOCKING|SERVER_CONNECTION_BATCH_SIZE)$/,
+];
+
+export function agentEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const [k, v] of Object.entries(base)) if (!SESSION_VARS.some((re) => re.test(k))) env[k] = v;
+  return { ...env, CI: "1", NO_COLOR: "1" };
+}
+
 export async function runAgent(spec: AgentSpec, prompt: string, cwd: string, o: { yolo: boolean; timeoutMs: number }) {
   const r = await exec(spec.bin, spec.args(prompt, { yolo: o.yolo }), {
     cwd,
     timeoutMs: o.timeoutMs,
-    env: { ...process.env, CI: "1", NO_COLOR: "1" },
+    env: agentEnv(),
   });
   let usage: AgentUsage = {};
   try {

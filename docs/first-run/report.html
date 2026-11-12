@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>benchmyrepo · click</title>
+<style>
+:root{
+  --bg:#fbfaf7; --surface:#ffffff; --ink:#16181d; --muted:#6b6f76; --line:#e7e3da; --track:#efece5;
+  --accent:#d9531e; --bar:#8a8f98; --pass:#1f7a45; --pass-bg:#e5f3ea; --fail:#b2392a; --fail-bg:#f9e7e3;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121417; --surface:#191c20; --ink:#eceae4; --muted:#9a9ea6; --line:#2a2e35; --track:#262a31;
+    --accent:#f0703a; --bar:#5d636d; --pass:#5fcf8c; --pass-bg:#173323; --fail:#f08a7a; --fail-bg:#3a1d19;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121417; --surface:#191c20; --ink:#eceae4; --muted:#9a9ea6; --line:#2a2e35; --track:#262a31;
+  --accent:#f0703a; --bar:#5d636d; --pass:#5fcf8c; --pass-bg:#173323; --fail:#f08a7a; --fail-bg:#3a1d19;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:15px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Inter,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+main{max-width:1080px;margin:0 auto;padding:48px 24px 64px}
+.kicker{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+h1{font-size:clamp(28px,4.4vw,44px);line-height:1.08;margin:0 0 14px;letter-spacing:-.02em;text-wrap:balance}
+h1 em{font-style:normal;color:var(--accent)}
+.lede{color:var(--muted);max-width:62ch;margin:0 0 32px}
+.facts{display:flex;flex-wrap:wrap;gap:8px 28px;margin:0 0 36px;padding:0;list-style:none;font-size:14px;color:var(--muted)}
+.facts b{color:var(--ink);font-variant-numeric:tabular-nums}
+h2{font-size:18px;margin:48px 0 12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+table{border-collapse:collapse;width:100%}
+.leader td{padding:14px 12px;border-top:1px solid var(--line);vertical-align:middle}
+.leader tr:first-child td{border-top:0}
+.leader thead th{font-size:12px;font-weight:500;color:var(--muted);text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+.leader thead th.num{text-align:right}
+.rank{width:36px;color:var(--muted);font-variant-numeric:tabular-nums}
+.agent{font-weight:600}
+.model{font-size:12px;color:var(--muted)}
+.barcell{width:34%}
+.bar{height:10px;border-radius:99px;background:var(--track);overflow:hidden}
+.bar span{display:block;height:100%;background:var(--bar);border-radius:99px}
+.lead .bar span{background:var(--accent)}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.big{font-size:20px;font-weight:700}
+.matrix-wrap{overflow-x:auto}
+.matrix{min-width:max-content}
+.matrix th,.matrix td{border-top:1px solid var(--line);padding:10px 12px}
+.matrix thead th{border-top:0;font-size:12px;font-weight:500;color:var(--muted);text-align:center;white-space:nowrap}
+.matrix thead th:first-child{text-align:left}
+.matrix th[scope=row]{text-align:left;font-weight:400;max-width:420px;min-width:220px}
+.tid{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ttitle a{color:inherit;text-decoration-color:var(--line);text-underline-offset:3px}
+.ttitle a:hover{text-decoration-color:var(--ink)}
+.cell{text-align:center;font-weight:700;min-width:64px}
+.cell.pass span{display:inline-block;min-width:28px;border-radius:6px;padding:2px 0;color:var(--pass);background:var(--pass-bg)}
+.cell.fail span{display:inline-block;min-width:28px;border-radius:6px;padding:2px 0;color:var(--fail);background:var(--fail-bg)}
+.cell.none{color:var(--muted)}
+.solvedby{color:var(--muted)}
+.how{color:var(--muted);font-size:14px;max-width:70ch}
+.how li{margin:4px 0}
+footer{margin-top:48px;font-size:13px;color:var(--muted)}
+code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--track);padding:1px 5px;border-radius:4px}
+@media (max-width:640px){
+  main{padding:32px 16px 48px}
+  .hide-sm{display:none}
+  .barcell{width:30%}
+  .leader td{padding:12px 8px}
+}
+</style>
+</head>
+<body>
+<main>
+  <p class="kicker">benchmyrepo · 2026-11-12_23-29-03</p>
+  <h1><em>claude:sonnet</em> and <em>claude:opus</em> tie at 25% on click's real PRs</h1>
+  <p class="lede">Each task is a merged PR from this repo. The agent starts from the code as it was before the PR, gets only the PR's description, and is graded by the tests that shipped with the PR. Nothing here was written by an LLM judge.</p>
+  <ul class="facts">
+    <li><b>8</b> tasks</li>
+    <li><b>3</b> agents</li>
+    <li><b>24</b> attempts</li>
+    <li><b>$3.93</b> reported cost</li>
+    
+  </ul>
+
+  <section class="card" aria-label="Leaderboard">
+    <table class="leader">
+      <thead><tr><th>#</th><th>Agent</th><th></th><th class="num">Rate</th><th class="num">Solved</th><th class="num hide-sm">Cost</th><th class="num hide-sm">$/solve</th><th class="num hide-sm">Median</th><th class="num hide-sm">Tokens</th></tr></thead>
+      <tbody>
+<tr class="lead">
+  <td class="rank">1</td>
+  <td><div class="agent">claude:sonnet</div><div class="model">claude-sonnet-5-5</div></td>
+  <td class="barcell"><div class="bar"><span style="width:25.0%"></span></div></td>
+  <td class="num big">25%</td>
+  <td class="num">2/8</td>
+  <td class="num hide-sm">$0.89</td>
+  <td class="num hide-sm">$0.44</td>
+  <td class="num hide-sm">23s</td>
+  <td class="num hide-sm">1.6M</td>
+</tr>
+<tr class="lead">
+  <td class="rank">1</td>
+  <td><div class="agent">claude:opus</div><div class="model">claude-opus-5-5</div></td>
+  <td class="barcell"><div class="bar"><span style="width:25.0%"></span></div></td>
+  <td class="num big">25%</td>
+  <td class="num">2/8</td>
+  <td class="num hide-sm">$2.94</td>
+  <td class="num hide-sm">$1.47</td>
+  <td class="num hide-sm">59s</td>
+  <td class="num hide-sm">3.5M</td>
+</tr>
+<tr>
+  <td class="rank">3</td>
+  <td><div class="agent">claude:haiku</div><div class="model">claude-haiku-5-5</div></td>
+  <td class="barcell"><div class="bar"><span style="width:0.0%"></span></div></td>
+  <td class="num big">0%</td>
+  <td class="num">0/8</td>
+  <td class="num hide-sm">$0.10</td>
+  <td class="num hide-sm">—</td>
+  <td class="num hide-sm">48s</td>
+  <td class="num hide-sm">3.4M</td>
+</tr>
+      </tbody>
+    </table>
+  </section>
+
+  <h2>Task by task</h2>
+  <section class="card matrix-wrap" aria-label="Results per task">
+    <table class="matrix">
+      <thead><tr><th>Task</th><th>claude:sonnet</th><th>claude:opus</th><th>claude:haiku</th><th>Solved by</th></tr></thead>
+      <tbody>
+<tr><th scope="row"><div class="tid">pr-3902 · 2026-11-12 · 113 lines</div><div class="ttitle"><a href="https://github.com/pallets/click/pull/3902">Help pages no longer break a line within a hyphenated word</a></div></th><td class="cell pass" title="claude:sonnet: Passed · 30s · $0.12 · 48 lines"><span aria-label="Passed">✓</span></td><td class="cell pass" title="claude:opus: Passed · 59s · $0.40 · 28 lines"><span aria-label="Passed">✓</span></td><td class="cell fail" title="claude:haiku: Tests failed · 48s · $0.01 · 16 lines"><span aria-label="Tests failed">✗</span></td><td class="num solvedby">2/3</td></tr>
+<tr><th scope="row"><div class="tid">pr-3896 · 2026-11-06 · 16 lines</div><div class="ttitle"><a href="https://github.com/pallets/click/pull/3896">Add `context_settings` parameter to `CliRunner.invoke`</a></div></th><td class="cell fail" title="claude:sonnet: Tests failed · 19s · $0.09 · 11 lines"><span aria-label="Tests failed">✗</span></td><td class="cell fail" title="claude:opus: Tests failed · 45s · $0.31 · 15 lines"><span aria-label="Tests failed">✗</span></td><td class="cell fail" title="claude:haiku: Tests failed · 25s · &lt;$0.01 · 15 lines"><span aria-label="Tests failed">✗</span></td><td class="num solvedby">0/3</td></tr>
+<tr><th scope="row"><div class="tid">pr-3878 · 2026-11-06 · 38 lines</div><div class="ttitle"><a href="https://github.com/pallets/click/pull/3878">Print `\x04` and `\x1a` input bytes as `^D` and `^Z` in `CliRunner`</a></div></th><td class="cell fail" title="claude:sonnet: Tests failed · 25s · $0.11 · 15 lines"><span aria-label="Tests failed">✗</span></td><td class="cell fail" title="claude:opus: Tests failed · 52s · $0.34 · 25 lines"><span aria-label="Tests failed">✗</span></td><td class="cell fail" title="claude:haiku: Tests failed · 54s · $0.01 · 81 lines"><span aria-label="Tests failed">✗</span></td><td class="num solvedby">0/3</td></tr>
+<tr><th scope="row"><div class="tid">pr-3901 · 2026-11-04 · 4 lines</div><div class="ttitle"><a href="https://github.com/pallets/click/pull/3901">Stop passing a deprecated command&#39;s help text through `gettext`</a></div></th><td class="cell pass" title="claude:sonnet: Passed · 15s · $0.08 · 4 lines"><span aria-label="Passed">✓</span></td><td class="cell pass" title="claude:opus: Passed · 35s · $0.22 · 6 lines"><span aria-label="Passed">✓</span></td><td class="cell fail" title="claude:haiku: Tests failed · 21s · &lt;$0.01 · 2 lines"><span aria-label="Tests failed">✗</span></td><td class="num solvedby">2/3</td></tr>
+<tr><th scope="row"><div class="tid">pr-3884 · 2026-10-06 · 23 lines</div><div class="ttitle"><a href="https://github.com/pallets/click/pull/3884">Fix `show_envvar` output for a sequence or an empty `envvar`</a></div></th><td class="cell fail" title="claude:sonnet: Tests failed · 19s · $0.09 · 10 lines"><span aria-label="Tests failed">✗</span></td><td class="cell fail" title="claude:opus: Tests failed · 36s · $0.21 · 10 lines"><span aria-label="Tests failed">✗</span></td><td class="cell fail" title="claude:haiku: Tests failed · 31s · &lt;$0.01 · 25 lines"><span aria-label="Tests failed">✗</span></td><td class="num solvedby">0/3</td></tr>
+<tr><th scope="row"><div class="tid">pr-3877 · 2026-10-04 · 133 lines</div><div class="ttitle"><a href="https://github.com/pallets/click/pull/3877">Add `Parameter.spec` and deprecate `human_readable_name`</a></div></th><td class="cell fail" title="claude:sonnet: Tests failed · 48s · $0.19 · 53 lines"><span aria-label="Tests failed">✗</span></td><td class="cell fail" title="claude:opus: Tests failed · 1.9m · $0.66 · 103 lines"><span aria-label="Tests failed">✗</span></td><td class="cell fail" title="claude:haiku: Tests failed · 1.6m · $0.02 · 142 lines"><span aria-label="Tests failed">✗</span></td><td class="num solvedby">0/3</td></tr>
+<tr><th scope="row"><div class="tid">pr-3860 · 2026-09-21 · 32 lines</div><div class="ttitle"><a href="https://github.com/pallets/click/pull/3860">Always list all positional arguments</a></div></th><td class="cell fail" title="claude:sonnet: Tests failed · 14s · $0.09 · 15 lines"><span aria-label="Tests failed">✗</span></td><td class="cell fail" title="claude:opus: Tests failed · 1.4m · $0.43 · 24 lines"><span aria-label="Tests failed">✗</span></td><td class="cell fail" title="claude:haiku: Tests failed · 42s · $0.01 · 15 lines"><span aria-label="Tests failed">✗</span></td><td class="num solvedby">0/3</td></tr>
+<tr><th scope="row"><div class="tid">pr-3865 · 2026-09-12 · 52 lines</div><div class="ttitle"><a href="https://github.com/pallets/click/pull/3865">Fix short help abbreviation</a></div></th><td class="cell fail" title="claude:sonnet: Tests failed · 23s · $0.11 · 41 lines"><span aria-label="Tests failed">✗</span></td><td class="cell fail" title="claude:opus: Tests failed · 1.1m · $0.36 · 48 lines"><span aria-label="Tests failed">✗</span></td><td class="cell fail" title="claude:haiku: Tests failed · 1.4m · $0.02 · 44 lines"><span aria-label="Tests failed">✗</span></td><td class="num solvedby">0/3</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <h2>How this was measured</h2>
+  <ul class="how">
+    <li>Tasks come from merged PRs that changed both source and tests and didn't change dependencies.</li>
+    <li>A task counts only if its tests fail before the fix and pass with the original fix on this machine.</li>
+    <li>Agents work in a throwaway copy with no git history, so they can't look up the real fix.</li>
+    <li>After the agent finishes, the PR's test files are restored to their merged versions and run.</li>
+    <li>Cost is what each agent CLI reports; subscription plans may not report it.</li>
+    <li>Versions: benchmyrepo 0.1.0, <code>claude</code> 2.1.310 (Claude Code). Started 2026-11-12 23:29 UTC.</li>
+  </ul>
+  <footer>Generated by <code>npx benchmyrepo</code>. Logs and patches for every attempt are in <code>.benchmyrepo/runs/2026-11-12_23-29-03/logs</code>.</footer>
+</main>
+</body>
+</html>
