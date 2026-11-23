@@ -6,6 +6,8 @@ import { formatFunnel, mineAndValidate } from "./mine.js";
 import { runBenchmark } from "./run.js";
 import { computeStats, terminalTable, writeReport } from "./report.js";
 import { Store } from "./store.js";
+import { readRunDir, updateReadme } from "./readme.js";
+import { resolve } from "node:path";
 
 const HELP = `benchmyrepo: benchmark coding agents on your own repo's merged PRs
 
@@ -16,6 +18,8 @@ Usage:
   benchmyrepo run      [--agents claude,codex] [--tasks 10] [--concurrency 2]
                      [--timeout 20] [--yolo] [--keep] [--resume <runId>]
   benchmyrepo report   [runId] [--open]
+  benchmyrepo readme   [runId | --run-dir <dir>] [--file README.md]
+                     [--card .github/benchmyrepo/leaderboard.svg]
   benchmyrepo doctor
 
 init    finds merged PRs that changed source + tests, and keeps the ones whose tests
@@ -23,6 +27,8 @@ init    finds merged PRs that changed source + tests, and keeps the ones whose t
 run     gives each agent the PR description in a clean copy of the repo at the
         pre-PR commit, then grades it with the PR's own tests.
 report  writes report.html, leaderboard.svg and badge.svg for a run (latest by default).
+readme  writes the run's card to --card and a short table between the
+        <!-- benchmyrepo:start --> and <!-- benchmyrepo:end --> lines of --file.
 
 Agents: ${BUILTIN_AGENTS.join(", ")}. Pick a model with agent:model, e.g. claude:opus.
 --yolo  lets agents run any command without asking (claude bypassPermissions,
@@ -51,6 +57,8 @@ export async function main(argv: string[]): Promise<number> {
       return run(root, store, rest);
     case "report":
       return report(store, rest);
+    case "readme":
+      return readme(root, store, rest);
     case "doctor":
       return doctor(root, store);
     default:
@@ -210,6 +218,35 @@ async function report(store: Store, argv: string[]): Promise<number> {
   log(`Share card:  ${files.card}`);
   log(`README badge: ${files.badge}`);
   if (values.open) await exec(process.platform === "darwin" ? "open" : "xdg-open", [files.html]);
+  return 0;
+}
+
+function readme(root: string, store: Store, argv: string[]): number {
+  const { values, positionals } = parseArgs({
+    args: argv,
+    allowPositionals: true,
+    options: {
+      "run-dir": { type: "string" },
+      file: { type: "string", default: "README.md" },
+      card: { type: "string", default: ".github/benchmyrepo/leaderboard.svg" },
+      "allow-errors": { type: "boolean", default: false },
+    },
+  });
+  let run;
+  if (values["run-dir"]) run = readRunDir(resolve(values["run-dir"]));
+  else {
+    const runId = positionals[0] ?? store.listRuns().at(-1);
+    if (!runId) throw new Error("no runs yet. Run: npx benchmyrepo run");
+    run = { meta: store.readRunMeta(runId), results: store.readResults(runId) };
+  }
+  const u = updateReadme({
+    ...run,
+    readmePath: resolve(root, values.file!),
+    cardPath: resolve(root, values.card!),
+    allowErrors: values["allow-errors"],
+  });
+  log(`${values.file}: ${u.readmeChanged ? "updated" : "unchanged"}`);
+  log(`${values.card}: ${u.cardChanged ? "updated" : "unchanged"}`);
   return 0;
 }
 
