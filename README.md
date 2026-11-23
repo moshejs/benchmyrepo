@@ -44,6 +44,7 @@ npx benchmyrepo init   [--tasks 20] [--scan 200] [--since 2026-01-01] [--source 
 npx benchmyrepo tasks
 npx benchmyrepo run    [--agents claude,claude:haiku,codex] [--tasks 10] [--concurrency 2] [--timeout 20] [--yolo]
 npx benchmyrepo report [runId] [--open]
+npx benchmyrepo readme [runId] [--file README.md] [--card .github/benchmyrepo/leaderboard.svg]
 npx benchmyrepo doctor
 ```
 
@@ -51,6 +52,8 @@ npx benchmyrepo doctor
 - `--yolo` lets agents run shell commands such as your test suite without asking. Without it, Claude runs with edit permissions only, Codex runs in its workspace sandbox, and Gemini auto-approves edits only. Agents run on your machine, so only use `--yolo` on code you trust.
 - Claude runs with `--setting-sources project,local`, so your personal hooks, `CLAUDE.md` and plugins don't change the result; the repo's own `.claude/` settings still apply. If you start benchmyrepo from inside an agent session, that session's variables aren't passed on to the agents.
 - `--resume <runId>` continues an interrupted run.
+- `readme` writes a run's card to `--card` and a short results table into your README, between a `<!-- benchmyrepo:start -->` line and a `<!-- benchmyrepo:end -->` line. The same run always produces the same files, so rerunning it leaves no diff.
+- Your tests never see `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, `CODEX_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_AUTH_TOKEN` or `CURSOR_API_KEY`: they run code an agent wrote.
 
 ### Custom agents
 
@@ -59,6 +62,70 @@ Add any CLI to `.benchmyrepo/config.json`:
 ```json
 { "agents": { "aider": "aider --yes-always --message-file {prompt_file}" } }
 ```
+
+## GitHub Action
+
+> **Not yet run on GitHub-hosted runners.** Everything below is tested locally (unit tests, `actionlint`, and the action's steps run end to end against throwaway repos with fake agents), but the action itself has never run in GitHub Actions.
+
+The action reruns the benchmark when a coding agent ships a new release and keeps the leaderboard card in your README up to date. It has three modes, meant for three jobs with different permissions:
+
+| Mode | What it does | Needs |
+|---|---|---|
+| `check` | Asks npm for each agent's latest release and compares it with `.github/benchmyrepo/agent-versions.json`. Free. | `contents: read` |
+| `bench` | Installs those exact agent versions, mines tasks from your merged PRs, runs the agents, grades them with your tests. Paid. | `contents: read`, `pull-requests: read`, an agent key |
+| `readme` | Writes the card, the README block and the versions file from a run, and commits them as `github-actions[bot]` if they changed. | `contents: write`, no agent key |
+
+Copy [`examples/benchmyrepo.yml`](examples/benchmyrepo.yml) to `.github/workflows/` in your repo, add your project's install step to the `bench` job (your tests must pass there), pin `moshejs/benchmyrepo` to a release commit SHA, and add these two lines to your README where the card should go:
+
+```markdown
+<!-- benchmyrepo:start -->
+<!-- benchmyrepo:end -->
+```
+
+The action fails rather than guess if they are missing or out of order. Markers inside a code block, like the ones above, are ignored.
+
+### When it runs
+
+The example runs `check` daily and `bench` only when an agent has a release the card wasn't made with, or when you start it by hand with **force**.
+
+| Agent | Release check | Source |
+|---|---|---|
+| `claude` | npm `@anthropic-ai/claude-code`, `latest` tag | `GET https://registry.npmjs.org/@anthropic-ai%2fclaude-code/latest` |
+| `codex` | npm `@openai/codex`, `latest` tag | `GET https://registry.npmjs.org/@openai%2fcodex/latest` |
+| `gemini` | npm `@google/gemini-cli`, `latest` tag | `GET https://registry.npmjs.org/@google%2fgemini-cli/latest` |
+| `cursor-agent` | none | Cursor installs it with a shell script. The npm package named `cursor-agent` belongs to someone else. Runs only when started by hand, and an earlier step must install it. |
+| custom agents | none | Started by hand only; install them in an earlier step. |
+
+The endpoint is the npm registry's documented `GET /{package}/{version}` with `latest` as the version ([registry API](https://github.com/npm/registry/blob/main/docs/REGISTRY-API.md)). It needs no token. A model update that ships without a new CLI release isn't detected.
+
+### Secrets
+
+Pass only the ones for the agents you run, as action inputs. They reach one step, the one that runs the agents, and benchmyrepo removes them again before your tests run.
+
+| Agent | Input | Secret | Source |
+|---|---|---|---|
+| `claude` | `anthropic-api-key` | `ANTHROPIC_API_KEY`, billed per token | [Claude Code env vars](https://code.claude.com/docs/en/env-vars) |
+| `claude` | `claude-code-oauth-token` | `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`, uses a subscription | [Claude Code env vars](https://code.claude.com/docs/en/env-vars) |
+| `codex` | `codex-api-key` | `CODEX_API_KEY` | [Codex non-interactive mode](https://learn.chatgpt.com/docs/non-interactive-mode) |
+| `gemini` | `gemini-api-key` | `GEMINI_API_KEY` | [Gemini CLI authentication](https://github.com/google-gemini/gemini-cli/blob/main/docs/get-started/authentication.mdx) |
+
+### Cost and time
+
+benchmyrepo has no dollar budget. The action limits what it can: `tasks × agents` must not exceed `max-attempts` (default 20, 10 in the example), each attempt is killed after `timeout` minutes (default 15), and the example job stops after 90 minutes.
+
+The only measured run is [the pallets/click run](docs/first-run.md): 24 attempts in 10 min 44 s at 2 at a time, $3.93 reported in all. Per attempt that was about $0.37 for `claude:opus`, $0.11 for `claude:sonnet` and $0.01 for `claude:haiku`, with medians of 23 to 59 s. Those are the CLI's API-price estimates for one small Python repo. At that rate the example (5 tasks × `claude:sonnet`) is about $0.55 per run, but cost on your repo is unknown until you measure it, and Codex and Gemini have never been measured. Mining also runs your tests twice per candidate PR, so a slow suite adds time but no API cost. On a hosted runner the job also uses Actions minutes.
+
+### Security
+
+- Agents run with edit permissions only; the action never passes `--yolo`.
+- The `bench` job checks out with `persist-credentials: false`, so no agent can push. Only `publish` can write, and it runs no agent and holds no agent key. Only `meta.json`, `results.jsonl` and `report.html` travel between them as an artifact; per-attempt logs stay on the runner.
+- Prompts include PR descriptions and linked issues, which anyone may have written on a public repo. Treat them as untrusted: keep the agents' permissions as they are and give the job no other secrets.
+- No `pull_request` or `pull_request_target` trigger, and the jobs skip forks.
+- Third-party actions in the example are pinned to full commit SHAs. Inputs reach the shell as environment variables, never interpolated into scripts.
+- The commit is `Update benchmyrepo leaderboard [skip ci]`, never force-pushed. If the branch moved during the run, it rebases once and pushes.
+- If every attempt by an agent errored (a missing CLI, a bad key), the run fails instead of publishing that agent at 0%.
+
+To try the README step without running agents, point `readme` mode at a run you already have, such as the artifact of an earlier run, with `commit: false`.
 
 ## Supported today
 

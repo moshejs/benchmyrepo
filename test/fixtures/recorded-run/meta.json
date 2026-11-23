@@ -1,0 +1,10 @@
+{
+  "runId": "2026-11-20_06-00-00",
+  "repo": "example-app",
+  "startedAt": "2026-11-20T06:00:00.000Z",
+  "agents": ["claude:sonnet", "claude:haiku"],
+  "taskIds": ["pr-101", "pr-102", "pr-103", "pr-104"],
+  "yolo": false,
+  "tool": "0.1.0",
+  "agentVersions": { "claude": "2.1.330 (Claude Code)" }
+}

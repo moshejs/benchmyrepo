@@ -1,0 +1,124 @@
+# Example: copy to .github/workflows/benchmyrepo.yml in the repo you want to benchmark.
+# This file is not a workflow of the benchmyrepo repo itself and never runs here.
+#
+# Once a day a free check asks npm whether claude has a new release. Only then (or when
+# you start it by hand with "force") does the paid benchmark run, and the README block
+# and card are committed by github-actions[bot] if they changed.
+#
+# Needs: a README with these two lines where the card should go
+#   <!-- benchmyrepo:start -->
+#   <!-- benchmyrepo:end -->
+# and the secret ANTHROPIC_API_KEY (or CLAUDE_CODE_OAUTH_TOKEN, see the README).
+name: benchmyrepo
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Run the benchmark even if no agent has a new release
+        type: boolean
+        default: false
+  schedule:
+    - cron: "23 7 * * *"
+
+# Nothing by default; each job asks for what it needs.
+permissions: {}
+
+concurrency:
+  group: benchmyrepo-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AGENTS: claude:sonnet
+
+jobs:
+  check:
+    # No runs on forks: they don't have your secrets and shouldn't spend them.
+    if: ${{ !github.event.repository.fork }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+      versions: ${{ steps.check.outputs.versions }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - id: check
+        # Pin to the full commit SHA of a benchmyrepo release you have read.
+        uses: moshejs/benchmyrepo@0000000000000000000000000000000000000000 # replace with a release commit SHA
+        with:
+          mode: check
+          agents: ${{ env.AGENTS }}
+
+  bench:
+    needs: check
+    if: needs.check.outputs.changed == 'true' || (github.event_name == 'workflow_dispatch' && inputs.force)
+    runs-on: ubuntu-latest
+    # Mining validates every candidate with your tests, then each attempt may take up to
+    # `timeout` minutes. 5 tasks × 1 agent at 2 at a time fits well inside this.
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # tasks come from history
+          persist-credentials: false # agents never get a token that can push
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      # Your project's setup goes here: benchmyrepo validates and grades with your own
+      # tests, so they must pass in this job. For a Node project:
+      - run: npm ci
+      - id: bench
+        uses: moshejs/benchmyrepo@0000000000000000000000000000000000000000 # replace with a release commit SHA
+        with:
+          mode: bench
+          agents: ${{ env.AGENTS }}
+          agent-versions: ${{ needs.check.outputs.versions }}
+          tasks: 5
+          max-attempts: 10
+          timeout: 15
+          # Keep PRs a model may have trained on out of the tasks.
+          since: "2026-07-01"
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: benchmyrepo-run
+          # Results and the report only; the per-attempt logs stay on the runner.
+          path: |
+            ${{ steps.bench.outputs.run-dir }}/meta.json
+            ${{ steps.bench.outputs.run-dir }}/results.jsonl
+            ${{ steps.bench.outputs.run-dir }}/report.html
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs: [check, bench]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The only job that can write, and it runs no agent and holds no agent key.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: benchmyrepo-run
+          path: ${{ runner.temp }}/benchmyrepo-run
+      - uses: moshejs/benchmyrepo@0000000000000000000000000000000000000000 # replace with a release commit SHA
+        with:
+          mode: readme
+          run-dir: ${{ runner.temp }}/benchmyrepo-run
+          agent-versions: ${{ needs.check.outputs.versions }}
+          commit: true

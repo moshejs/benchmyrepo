@@ -1,0 +1,219 @@
+name: benchmyrepo
+description: Benchmark coding agents on your repo's own merged PRs and keep a leaderboard card in your README.
+author: moshejs
+branding:
+  icon: bar-chart-2
+  color: orange
+
+# Three modes, meant for three jobs with different permissions (see examples/benchmyrepo.yml):
+#   check   asks npm for each agent's latest release; no secrets, read-only.
+#   bench   mines tasks, runs the agents, grades them; needs agent keys, read-only.
+#   readme  writes the card and the README block from a run; commits only if asked.
+inputs:
+  mode:
+    description: "check, bench or readme."
+    required: true
+  agents:
+    description: 'Agents to run, as for `benchmyrepo run --agents`, e.g. "claude:sonnet,codex". Required for check and bench.'
+    required: false
+    default: ""
+  tasks:
+    description: "Tasks to mine and run per agent (bench)."
+    required: false
+    default: "5"
+  max-attempts:
+    description: "Refuse to start when tasks × agents is larger than this (bench). The tool has no dollar budget; this caps the number of agent attempts."
+    required: false
+    default: "20"
+  timeout:
+    description: "Minutes each agent attempt may take (bench)."
+    required: false
+    default: "15"
+  concurrency:
+    description: "Agent attempts at a time (bench)."
+    required: false
+    default: "2"
+  since:
+    description: "Only mine PRs merged on or after this date, YYYY-MM-DD (bench). Use it to keep PRs a model may have trained on out."
+    required: false
+    default: ""
+  scan:
+    description: "How many merged PRs to look at (bench)."
+    required: false
+    default: "200"
+  source:
+    description: "github or git; empty lets benchmyrepo pick (bench)."
+    required: false
+    default: ""
+  test-cmd:
+    description: 'Test command with {files}, if benchmyrepo can''t detect it (bench).'
+    required: false
+    default: ""
+  install-agents:
+    description: "Install the claude, codex and gemini CLIs from npm at the versions in agent-versions (bench). Set false if an earlier step installs them."
+    required: false
+    default: "true"
+  agent-versions:
+    description: "JSON from the check mode's versions output. bench installs exactly these; readme records them in state-file."
+    required: false
+    default: ""
+  state-file:
+    description: "Where the versions behind the current card are kept, relative to the repo root."
+    required: false
+    default: .github/benchmyrepo/agent-versions.json
+  run-dir:
+    description: "A run directory holding meta.json and results.jsonl (readme). Point it at a recorded run for a dry run."
+    required: false
+    default: ""
+  readme:
+    description: "README to update, relative to the repo root (readme). It needs a <!-- benchmyrepo:start --> line and a <!-- benchmyrepo:end --> line."
+    required: false
+    default: README.md
+  card:
+    description: "Where to write the leaderboard SVG, relative to the repo root (readme)."
+    required: false
+    default: .github/benchmyrepo/leaderboard.svg
+  commit:
+    description: 'Commit and push the changed files as github-actions[bot] (readme). Needs "contents: write" on the job.'
+    required: false
+    default: "false"
+  branch:
+    description: "Branch to push to (readme with commit)."
+    required: false
+    default: ${{ github.ref_name }}
+  working-directory:
+    description: "Any directory inside the repo's checkout."
+    required: false
+    default: "."
+  github-token:
+    description: "Token for `gh pr list` while mining (bench). Read access is enough."
+    required: false
+    default: ${{ github.token }}
+  anthropic-api-key:
+    description: "For claude (bench). Pass a secret."
+    required: false
+    default: ""
+  claude-code-oauth-token:
+    description: "For claude on a subscription, from `claude setup-token` (bench). Pass a secret."
+    required: false
+    default: ""
+  codex-api-key:
+    description: "For codex (bench). Pass a secret."
+    required: false
+    default: ""
+  gemini-api-key:
+    description: "For gemini (bench). Pass a secret."
+    required: false
+    default: ""
+
+outputs:
+  changed:
+    description: "check: an agent has a release the card wasn't made with. readme: the README, card or state file changed."
+    value: ${{ steps.check.outputs.changed || steps.readme.outputs.changed }}
+  changed-agents:
+    description: "check: the agents with a new release, comma-separated."
+    value: ${{ steps.check.outputs.changed-agents }}
+  versions:
+    description: "check: latest npm version of each agent that has a release check, as JSON."
+    value: ${{ steps.check.outputs.versions }}
+  untracked:
+    description: "check: agents with no release check (they rerun only when started by hand)."
+    value: ${{ steps.check.outputs.untracked }}
+  run-id:
+    description: "bench: the run's id."
+    value: ${{ steps.run.outputs.run-id }}
+  run-dir:
+    description: "bench: absolute path of the run directory (meta.json, results.jsonl, report.html, logs)."
+    value: ${{ steps.run.outputs.run-dir }}
+  commit:
+    description: "readme with commit: the pushed commit."
+    value: ${{ steps.readme.outputs.commit }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check mode
+      if: inputs.mode != 'check' && inputs.mode != 'bench' && inputs.mode != 'readme'
+      shell: bash
+      env:
+        BMR_MODE: ${{ inputs.mode }}
+      run: |
+        echo "::error::mode must be check, bench or readme (got \"$BMR_MODE\")"
+        exit 1
+
+    - name: Build benchmyrepo
+      shell: bash
+      run: bash "$GITHUB_ACTION_PATH/action/steps.sh" build
+
+    - name: Check for agent releases
+      id: check
+      if: inputs.mode == 'check'
+      shell: bash
+      env:
+        BMR_AGENTS: ${{ inputs.agents }}
+        BMR_STATE_FILE: ${{ inputs.state-file }}
+        BMR_WORKING_DIRECTORY: ${{ inputs.working-directory }}
+      run: bash "$GITHUB_ACTION_PATH/action/steps.sh" check
+
+    - name: Check attempt limit
+      if: inputs.mode == 'bench'
+      shell: bash
+      env:
+        BMR_AGENTS: ${{ inputs.agents }}
+        BMR_TASKS: ${{ inputs.tasks }}
+        BMR_MAX_ATTEMPTS: ${{ inputs.max-attempts }}
+      run: bash "$GITHUB_ACTION_PATH/action/steps.sh" guard
+
+    - name: Install agent CLIs
+      if: inputs.mode == 'bench' && inputs.install-agents == 'true'
+      shell: bash
+      env:
+        BMR_AGENTS: ${{ inputs.agents }}
+        BMR_AGENT_VERSIONS: ${{ inputs.agent-versions }}
+      run: bash "$GITHUB_ACTION_PATH/action/steps.sh" install
+
+    - name: Mine and validate tasks
+      if: inputs.mode == 'bench'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        BMR_TASKS: ${{ inputs.tasks }}
+        BMR_SCAN: ${{ inputs.scan }}
+        BMR_SINCE: ${{ inputs.since }}
+        BMR_SOURCE: ${{ inputs.source }}
+        BMR_TEST_CMD: ${{ inputs.test-cmd }}
+        BMR_WORKING_DIRECTORY: ${{ inputs.working-directory }}
+      run: bash "$GITHUB_ACTION_PATH/action/steps.sh" init
+
+    # The only step that sees the agent keys. benchmyrepo removes them again before it
+    # runs your tests, which execute code the agents wrote.
+    - name: Run agents
+      id: run
+      if: inputs.mode == 'bench'
+      shell: bash
+      env:
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-code-oauth-token }}
+        CODEX_API_KEY: ${{ inputs.codex-api-key }}
+        GEMINI_API_KEY: ${{ inputs.gemini-api-key }}
+        BMR_AGENTS: ${{ inputs.agents }}
+        BMR_TASKS: ${{ inputs.tasks }}
+        BMR_CONCURRENCY: ${{ inputs.concurrency }}
+        BMR_TIMEOUT: ${{ inputs.timeout }}
+        BMR_WORKING_DIRECTORY: ${{ inputs.working-directory }}
+      run: bash "$GITHUB_ACTION_PATH/action/steps.sh" run
+
+    - name: Update README and card
+      id: readme
+      if: inputs.mode == 'readme'
+      shell: bash
+      env:
+        BMR_RUN_DIR: ${{ inputs.run-dir }}
+        BMR_README: ${{ inputs.readme }}
+        BMR_CARD: ${{ inputs.card }}
+        BMR_STATE_FILE: ${{ inputs.state-file }}
+        BMR_AGENT_VERSIONS: ${{ inputs.agent-versions }}
+        BMR_COMMIT: ${{ inputs.commit }}
+        BMR_BRANCH: ${{ inputs.branch }}
+        BMR_WORKING_DIRECTORY: ${{ inputs.working-directory }}
+      run: bash "$GITHUB_ACTION_PATH/action/steps.sh" readme

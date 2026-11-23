@@ -85,8 +85,20 @@ export function testCommandFor(config: Config, task: Task): string {
     .replaceAll("{pkgs}", pkgs.map(shellQuote).join(" "));
 }
 
+/**
+ * Credentials for the agent CLIs. Tests run code an agent wrote, so they never see these:
+ * in CI a prompt-injected agent could otherwise write code that reads them when graded.
+ */
+export const AGENT_CREDENTIALS = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "CODEX_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "CURSOR_API_KEY"];
+
+export function testEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...base, CI: "1", FORCE_COLOR: "0", NO_COLOR: "1" };
+  for (const k of AGENT_CREDENTIALS) delete env[k];
+  return env;
+}
+
 export async function runTests(dir: string, config: Config, task: Task): Promise<ExecResult> {
-  const env: NodeJS.ProcessEnv = { ...process.env, CI: "1", FORCE_COLOR: "0", NO_COLOR: "1" };
+  const env = testEnv();
   for (const [k, v] of Object.entries(config.testEnv)) {
     const val = v.replaceAll("{ws}", dir);
     env[k] = env[k] ? `${val}:${env[k]}` : val;
